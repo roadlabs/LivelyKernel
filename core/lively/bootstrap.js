@@ -688,6 +688,7 @@
 
             // while loading the combined file we replace the loader
             Global.JSLoader = combinedLoader;
+            Global.JSLoader.__proto__ = originalLoader;
             this.loadJs(combinedFileUrl, callCallback,
                         false, false, hash);
         },
@@ -736,6 +737,23 @@
         },
 
         removeQueries: function(url) { return url.split('?')[0]; },
+
+        getOption: browserDetector.isNodejs() ?
+            function(option) { return undefined; /* TODO: get Node.JS cmd args */ } :
+            function(option) {
+                if (option == null) return null;
+                var queryString = document.location.search.toString();
+                option = option.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+                var regex = new RegExp("[\\?&]" + option + "=([^&#]*)"),
+                    result = regex.exec(queryString);
+                if (result != null) {
+                    result = decodeURIComponent(result[1].replace(/\+/g, " "));
+                    if (result == true.toString()) result = true;
+                    if (result == false.toString()) result = false;
+                    if (result == parseInt(result).toString()) result = parseInt(result);
+                }
+                return result;
+            },
 
         resolveURLString: function(urlString) {
             // FIXME duplicated from URL class in lively. Network actually
@@ -965,10 +983,11 @@
             if (dontBootstrap) { thenDoFunc(); return }
 
             var cb = this.codeBase,
-                optimizedLoading = !url.match('quickLoad=false')
-                                && !url.match('!svn')
+                optimizedLoading = Global.JSLoader.getOption('quickLoad')
+                                && !url.match('!svn') // TODO: or timemachine (Git)
                                 && url.match('webwerkstatt')
                                 && url.match('lively-kernel.org');
+            optimizedLoading = Global.JSLoader.getOption('quickLoad');
 
             if (optimizedLoading) {
                 console.log('optimized loading enabled');
